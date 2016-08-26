@@ -42,6 +42,8 @@ module Chip8 =
     PC    := 0
     SP    := 0
 
+  let hexs (n:int) = n.ToString("X4");
+
   let cls() = ()
 
   let pixel x y = printfn "PIXEL"; false
@@ -55,14 +57,16 @@ module Chip8 =
     let opcode = (int upper * 256) + int lower
     let x = opcode &&& 0x0F00 >>> 8
     let y = opcode &&& 0x00F0 >>> 4
+    let addr = opcode &&& 0x0FFF
   
-    printfn "COUNTER: %i (0x%s)" counter (counter.ToString("X4"))
-    printfn "OPCODE:  %i (0x%s)" opcode (opcode.ToString("X4"))
-    printfn "X:       %i (0x%s)" x (x.ToString("X4"))
-    printfn "Y:       %i (0x%s)" y (y.ToString("X4"))
-    printfn "SP:      %i (0x%s)" SP.contents (SP.contents.ToString("X4"))
-    printfn "I:       %i (0x%s)" I.contents (I.contents.ToString("X4"))
-    printfn "STACK:   %A" STACK
+    printfn "COUNTER:  (0x%s) %i" (hexs counter) counter
+    printfn "OPCODE:   (0x%s) %i" (hexs opcode) opcode
+    printfn "ADDR:     (0x%s) %i" (hexs addr) addr
+    printfn "X:        (0x%s) %i" (hexs x) x
+    printfn "Y:        (0x%s) %i" (hexs y) y
+    printfn "SP:       (0x%s) %i" (hexs SP.contents) SP.contents
+    printfn "I:        (0x%s) %i" (hexs I.contents) I.contents
+    printfn "STACK:    %A" STACK
 
     PC := counter + 2
 
