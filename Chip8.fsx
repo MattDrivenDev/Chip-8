@@ -1,18 +1,23 @@
 /// http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 module Chip8 =
-
+  
+  let f = new System.Windows.Forms.Form(Width=64*8, Height=32*8, BackColor=System.Drawing.Color.Black)
+  let green = new System.Drawing.SolidBrush(System.Drawing.Color.Green)
+  let black = new System.Drawing.SolidBrush(System.Drawing.Color.Black)
+  let mutable rect = new System.Drawing.Rectangle(0, 0, 8, 8)
+  let g = f.CreateGraphics()
   let mutable private MEM   = Array.create 4096 0uy
   let mutable private V     = Array.create 16 0uy
   let mutable private STACK = Array.create 16 0us
   let mutable private KEYS  = Array.create 16 0uy
-  let mutable private DRAW  = false
+  let mutable private DRAW  = false  
   let private I             = ref 0
   let private DT            = ref 0
   let private ST            = ref 0
   let private PC            = ref 0
   let private SP            = ref 0
   let private SETKEY        = ref 0
-  let private RANDOM        = System.Random(System.DateTime.Now.Ticks |> int)
+  let private RANDOM        = System.Random(System.DateTime.Now.Ticks |> int)  
   let private FONT          = [| (*0*) 0xF0us; 0x90us; 0x90us; 0x90us; 0xF0us;
                                  (*1*) 0x20us; 0x60us; 0x20us; 0x20us; 0x70us;
                                  (*2*) 0xF0us; 0x10us; 0xF0us; 0x80us; 0xF0us;
@@ -46,9 +51,23 @@ module Chip8 =
 
   let cls() = ()
 
-  let pixel x y = printfn "PIXEL"; false
+  let mutable private DISPLAY = Array2D.create 64 32 0
 
-  let rec private interpret() =
+  let private pixel x y = 
+    let x' = 
+      match x with
+      | _ when x > 64 -> x - 64
+      | _ when x < 0 -> x + 64
+      | _ -> x
+    let y' = 
+      match y with
+      | _ when y > 32 -> y - 32
+      | _ when y < 0 -> y + 32
+      | _ -> y
+    DISPLAY.[x',y'] <- DISPLAY.[x',y'] ^^^ 1
+    not (DISPLAY.[x',y'] = 1)
+
+  let rec private interpret() = 
     printfn "=== INTERPRETER LOOP =================================="
     let counter = PC.contents
 
@@ -167,7 +186,10 @@ module Chip8 =
         spr <- MEM.[I.contents + int a]
         for b in 0uy..8uy do
           if (spr &&& byte 0x80) > 0uy
-            then if pixel rx ry then V.[0xF] <- 1uy else ()
+            then 
+              if pixel (int rx) (int ry) 
+                then V.[0xF] <- 1uy 
+                else ()
             else ()
           spr <- spr <<< 1
         DRAW <- true
@@ -217,15 +239,33 @@ module Chip8 =
       | _ -> failwithf "unknown instruction: 0xF000 %X" opcode
     | _ -> failwithf "unknown instruction: %X" opcode
 
-    interpret()
+  let render x y = 
+    rect.X <- x * 8
+    rect.Y <- y * 8
+    function
+    | 0 -> printfn "X:%i-Y:%i draw" x y; g.FillRectangle(green, rect)
+    | _ -> g.FillRectangle(black, rect)
 
   /// Run's the interpreter given a specified ROM
   let run rom = 
     printfn "RUN"
     Array.blit rom 0 MEM 512 rom.Length
     PC := 512
-    interpret() |> ignore
+    f.Show()      
 
+    let update() = async {
+      do! Async.Sleep 160
+      interpret() }
+
+    let draw() = async {
+      Array2D.iteri render DISPLAY }
+
+    let rec loop() = async {
+      do! update()
+      do! draw()
+      do! loop() }
+
+    Async.Start (loop())
 
 System.Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
 let rom = System.IO.File.ReadAllBytes("tetris.c8")
