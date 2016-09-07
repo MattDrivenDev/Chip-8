@@ -1,7 +1,7 @@
 /// http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 module Chip8 =
   
-  let f = new System.Windows.Forms.Form(Width=64*8, Height=32*8, BackColor=System.Drawing.Color.Black)
+  let f = new System.Windows.Forms.Form(Width=69*8, Height=40*8, BackColor=System.Drawing.Color.Black)
   let green = new System.Drawing.SolidBrush(System.Drawing.Color.Green)
   let black = new System.Drawing.SolidBrush(System.Drawing.Color.Black)
   let mutable rect = new System.Drawing.Rectangle(0, 0, 8, 8)
@@ -187,8 +187,8 @@ module Chip8 =
         for b in 0uy..8uy do
           if (spr &&& byte 0x80) > 0uy
             then 
-              if pixel (int rx) (int ry) 
-                then V.[0xF] <- 1uy 
+              if pixel (int (rx + b)) (int (ry + a))                 
+                then V.[0xF] <- 1uy // Mark the collision detector flag
                 else ()
             else ()
           spr <- spr <<< 1
@@ -238,13 +238,31 @@ module Chip8 =
           V.[a] <- MEM.[I.contents + a]
       | _ -> failwithf "unknown instruction: 0xF000 %X" opcode
     | _ -> failwithf "unknown instruction: %X" opcode
-
+    
+  /// Renders whatever is at coords x,y
+  /// Offset the coords by 1 "pixel" because of our border.
+  /// Each "pixel" is 8*8 real pixels so have to multiply it up.
   let render x y = 
-    rect.X <- x * 8
-    rect.Y <- y * 8
+    rect.X <- (x + 1) * 8
+    rect.Y <- (y + 1) * 8
     function
-    | 0 -> printfn "X:%i-Y:%i draw" x y; g.FillRectangle(green, rect)
-    | _ -> g.FillRectangle(black, rect)
+    | 0 -> g.FillRectangle(black, rect)
+    | _ -> 
+      printfn "draw green (x,y): %i,%i (%i,%i)" x y rect.X rect.Y
+      g.FillRectangle(green, rect)
+
+  /// Just wraps the playing area in a border
+  let renderPlayArea() = 
+    for a in 0..66 do
+      for b in 0..34 do
+        rect.X <- a*8
+        rect.Y <- b*8
+        match a, b with
+        | 0,_-> g.FillRectangle(green, rect)
+        | _,0-> g.FillRectangle(green, rect)
+        | _,34->g.FillRectangle(green, rect)
+        | 66,_->g.FillRectangle(green, rect)
+        | _,_->()
 
   /// Run's the interpreter given a specified ROM
   let run rom = 
@@ -254,7 +272,7 @@ module Chip8 =
     f.Show()      
 
     let update() = async {
-      do! Async.Sleep 160
+      do! Async.Sleep 16
       interpret() }
 
     let draw() = async {
@@ -265,8 +283,9 @@ module Chip8 =
       do! draw()
       do! loop() }
 
+    renderPlayArea()
     Async.Start (loop())
 
 System.Environment.CurrentDirectory <- __SOURCE_DIRECTORY__
-let rom = System.IO.File.ReadAllBytes("tetris.c8")
+let rom = System.IO.File.ReadAllBytes("pong.c8")
 Chip8.run rom
