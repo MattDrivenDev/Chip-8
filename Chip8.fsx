@@ -1,22 +1,22 @@
 /// http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
 module Chip8 =
   
-  let f = new System.Windows.Forms.Form(Width=69*8, Height=40*8, BackColor=System.Drawing.Color.Black)
+  let f = new System.Windows.Forms.Form(Width=69*8, Height=40*8, BackColor=System.Drawing.Color.Black)  
   let green = new System.Drawing.SolidBrush(System.Drawing.Color.Green)
   let black = new System.Drawing.SolidBrush(System.Drawing.Color.Black)
   let mutable rect = new System.Drawing.Rectangle(0, 0, 8, 8)
   let g = f.CreateGraphics()
+  let mutable private await = false
   let mutable private MEM   = Array.create 4096 0uy
   let mutable private V     = Array.create 16 0uy
   let mutable private STACK = Array.create 16 0us
-  let mutable private KEYS  = Array.create 16 0uy
-  let mutable private DRAW  = false  
+  let mutable private KEYS  = Array.create 16 false
   let private I             = ref 0
   let private DT            = ref 0
   let private ST            = ref 0
   let private PC            = ref 0
-  let private SP            = ref 0
-  let private SETKEY        = ref 0
+  let private SP            = ref 0  
+  let private KEYVx         = ref 0
   let private RANDOM        = System.Random(System.DateTime.Now.Ticks |> int)  
   let private FONT          = [| (*0*) 0xF0us; 0x90us; 0x90us; 0x90us; 0xF0us;
                                  (*1*) 0x20us; 0x60us; 0x20us; 0x20us; 0x70us;
@@ -67,6 +67,9 @@ module Chip8 =
     DISPLAY.[x',y'] <- DISPLAY.[x',y'] ^^^ 1
     not (DISPLAY.[x',y'] = 1)
 
+  let awaitKeypress() =
+    await <- true
+
   let rec private interpret() = 
     printfn "=== INTERPRETER LOOP =================================="
     let counter = PC.contents
@@ -85,6 +88,7 @@ module Chip8 =
     printfn "Y:        (0x%s) %i" (hexs y) y
     printfn "SP:       (0x%s) %i" (hexs SP.contents) SP.contents
     printfn "I:        (0x%s) %i" (hexs I.contents) I.contents
+    printfn "DT:       (0x%s) %i" (hexs !DT) !DT
     printfn "STACK:    %A" STACK
 
     PC := counter + 2
@@ -192,15 +196,14 @@ module Chip8 =
                 else ()
             else ()
           spr <- spr <<< 1
-        DRAW <- true
     | 0xE000 ->
       match opcode &&& 0x00FF with
       | 0x009E -> 
         printfn "SKP Vx"
-        if KEYS.[int V.[x]] <> 0uy then PC := PC.contents + 2 else ()
+        if KEYS.[int V.[x]] = true then PC := !PC + 2 else ()
       | 0x00A1 ->
         printfn "SKNP Vx"
-        if not (KEYS.[int V.[x]] <> 0uy) then PC := PC.contents + 2 else ()
+        if KEYS.[int V.[x]] = false then PC := !PC + 2 else ()
       | _ -> failwithf "unknown instruction: 0xE000 %X" opcode
     | 0xF000 ->
       match opcode &&& 0x00FF with
@@ -208,8 +211,9 @@ module Chip8 =
         printfn "LD Vx, DT"
         V.[x] <- byte DT.contents
       | 0x000A ->        
-        printfn "LD Vx, KEY" 
-        () // TODO
+        printfn "LD Vx, KEY"
+        KEYVx := x
+        awaitKeypress()                     
       | 0x0015 ->
         printfn "LD DT, Vx"
         DT := int V.[x]
@@ -264,12 +268,46 @@ module Chip8 =
         | 66,_->g.FillRectangle(green, rect)
         | _,_->()
 
+  let captureKeypress k = 
+    V.[!KEYVx] <- byte k
+    await <- false
+
+  let key pressed (k:System.Windows.Forms.KeyEventArgs) =
+    let set n =
+      KEYS.[n] <- pressed
+      printfn "Key: %s" (k.KeyCode.ToString())
+      if await then captureKeypress n else ()
+    match k.KeyCode with
+    | System.Windows.Forms.Keys.NumPad0 -> set  0
+    | System.Windows.Forms.Keys.NumPad1 -> set  1
+    | System.Windows.Forms.Keys.NumPad2 -> set  2
+    | System.Windows.Forms.Keys.NumPad3 -> set  3
+    | System.Windows.Forms.Keys.NumPad4 -> set  4
+    | System.Windows.Forms.Keys.NumPad5 -> set  5
+    | System.Windows.Forms.Keys.NumPad6 -> set  6
+    | System.Windows.Forms.Keys.NumPad7 -> set  7
+    | System.Windows.Forms.Keys.NumPad8 -> set  8
+    | System.Windows.Forms.Keys.NumPad9 -> set  9
+    | System.Windows.Forms.Keys.Z       -> set 10
+    | System.Windows.Forms.Keys.X       -> set 11
+    | System.Windows.Forms.Keys.C       -> set 12
+    | System.Windows.Forms.Keys.V       -> set 13
+    | System.Windows.Forms.Keys.B       -> set 14
+    | System.Windows.Forms.Keys.N       -> set 15
+    | _ -> printfn "Key: %s ignored" (k.KeyCode.ToString())
+
   /// Run's the interpreter given a specified ROM
   let run rom = 
     printfn "RUN"
     Array.blit rom 0 MEM 512 rom.Length
     PC := 512
+    f.KeyDown.Add (key true)
+    f.KeyUp.Add (key false)
     f.Show()      
+
+    let timers() = async {
+      if !DT > 0 then DT := !DT - 1 else ()
+    }
 
     let update() = async {
       do! Async.Sleep 16
@@ -279,9 +317,13 @@ module Chip8 =
       Array2D.iteri render DISPLAY }
 
     let rec loop() = async {
-      do! update()
-      do! draw()
-      do! loop() }
+      if await 
+        then printfn "Awaiting keypress"
+        else
+          do! timers()
+          do! update()
+          do! draw()
+          do! loop() }      
 
     renderPlayArea()
     Async.Start (loop())
