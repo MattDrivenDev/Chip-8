@@ -27,7 +27,7 @@ open System.IO
 let IsDebug = true
 
 [<Literal>]
-let GameFilename = "pong.c8"
+let GameFilename = "tetris.c8"
 
 [<Literal>]
 let PixelWidth = 8
@@ -225,9 +225,9 @@ let ``DRW Vx, Vy, nibble`` {X=x; Y=y; N=n} =
   V.[0xF] <- 0uy
   let rx, ry = V.[int x], V.[int y]
   let mutable spr = 0uy
-  for a in 0uy..n do  
+  for a in 0uy..n-1uy do  
     spr <- RAM.[!I + int a]
-    for b in 0uy..8uy do
+    for b in 0uy..7uy do
       if (spr &&& byte 0x80) > 0uy
         then 
           if pixel (int (rx + b)) (int (ry + a))                 
