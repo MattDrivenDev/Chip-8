@@ -9,6 +9,8 @@
 
 What it says on the tin.
 
+![Screenshot playing Tetris](https://github.com/MattDrivenDev/Chip-8/blob/master/tetris-screenshot.png)
+
 ### Suggestions of things to do:
 
 * Make it (more) functional 
