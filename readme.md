@@ -11,6 +11,9 @@ What it says on the tin.
 
 ![Screenshot playing Tetris](https://github.com/MattDrivenDev/Chip-8/blob/master/tetris-screenshot.png)
 
+## Update
+I've started putting another version together with C on the [Raylib library](https://www.raylib.com/) which can be found here: [https://github.com/MattDrivenDev/raychip-8](https://github.com/MattDrivenDev/raychip-8).
+
 ### Suggestions of things to do:
 
 * Make it (more) functional 
